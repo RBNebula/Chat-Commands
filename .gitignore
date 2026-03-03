@@ -1,5 +1,9 @@
-bin/
-obj/
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+[Rr]eleases/
+artifacts/
 
 .vs/
 .vscode/
@@ -8,3 +12,7 @@ obj/
 *.suo
 *.userosscache
 *.sln.docstates
+*.binlog
+
+*.nupkg
+*.snupkg
