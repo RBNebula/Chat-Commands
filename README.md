@@ -10,6 +10,7 @@ Shared in-game command bar for MineMogul mods.
 - Press `Enter` to dispatch.
 - Press `Esc` to close.
 - Type `/help` to show registered prefixes.
+- Type `/help <prefix>` (example: `/help mb`) to show that prefix's commands and descriptions.
 - Unknown prefixes show an on-screen error line in history.
 - Inline autocomplete appears in gray.
 - `Tab` accepts/cycles suggestions by command segment.
@@ -42,6 +43,15 @@ bool UnregisterPrefix(string prefix);
 bool SetCommands(string prefix, IEnumerable<string> commands);
 bool SetCommands(string prefix, IEnumerable<string> commands, out string error);
 
+readonly struct CommandDefinition
+{
+    string Command { get; }
+    string Description { get; }
+}
+
+bool SetCommands(string prefix, IEnumerable<CommandDefinition> commands);
+bool SetCommands(string prefix, IEnumerable<CommandDefinition> commands, out string error);
+
 bool PublishInfo(string message);
 bool PublishInfo(string message, out string error);
 
@@ -53,65 +63,94 @@ Notes:
 - `handler` receives everything after `/<prefix>`.
 - Example: `/mymod print success` -> handler args are `print success`.
 - All calls return `false` if the host is not ready.
+- `CommandDefinition.Description` is optional, and appears in `/help <prefix>` output when provided.
 
 ## Full Mod Example
 
-This plugin registers `/mymod`, supports `/mymod print success`, and logs `Command execution successful.` to the BepInEx log.
+This plugin registers `/minersbp`, routes commands through a dictionary-based handler, and publishes command descriptions for `/help minersbp`.
 
 ```csharp
 using System;
+using System.Collections.Generic;
 using BepInEx;
 using ChatCommands;
 
-[BepInPlugin("com.mymod", "My Mod", "1.0.0")]
+[BepInPlugin("com.minersbp", "Miners Blueprint", "1.0.0")]
 [BepInDependency("com.chatcommands", BepInDependency.DependencyFlags.HardDependency)]
-public sealed class MyModPlugin : BaseUnityPlugin
+public sealed class MinersBlueprintPlugin : BaseUnityPlugin
 {
+    private readonly Dictionary<string, Action> _commands = new(StringComparer.OrdinalIgnoreCase);
+
+    // Handling the commands locally
     private void Awake()
     {
+        // Check if available
         if (!ChatCommandsApi.IsAvailable)
         {
             Logger.LogWarning("ChatCommands API is not available yet.");
             return;
         }
 
+        _commands["set pos 1"] = HandleSetPos1;
+        _commands["set pos 2"] = HandleSetPos2;
+        _commands["copy"] = HandleCopy;
+        _commands["paste"] = HandlePaste;
+
+        // Registering command prefix
         if (!ChatCommandsApi.RegisterPrefix(
-                prefix: "mymod",
-                owner: "com.mymod",
-                handler: HandleMyModCommand,
+                prefix: "minersbp",
+                owner: "com.minersbp",
+                handler: ChatCommandHandler,
                 error: out var registerError,
-                description: "My mod command root"))
+                description: "Miners Blueprint commands"))
         {
-            Logger.LogError($"Failed to register /mymod: {registerError}");
+            Logger.LogError($"Failed to register /minersbp: {registerError}");
             return;
         }
 
-        if (!ChatCommandsApi.SetCommands("mymod", new[]
-            {
-                "/mymod print success"
-            }, out var setCommandsError))
+        // Optional command metadata for autocomplete and /help output.
+        // Actual command behavior is implemented in ChatCommandHandler + _commands map.
+        ChatCommandsApi.SetCommands("minersbp", new[]
         {
-            Logger.LogWarning($"Failed to set /mymod autocomplete commands: {setCommandsError}");
+            new ChatCommandsApi.CommandDefinition("/minersbp set pos 1", "Set position 1."),
+            new ChatCommandsApi.CommandDefinition("/minersbp set pos 2", "Set position 2."),
+            new ChatCommandsApi.CommandDefinition("/minersbp copy", "Copy current selection."),
+            new ChatCommandsApi.CommandDefinition("/minersbp paste", "Paste current clipboard."),
+            new ChatCommandsApi.CommandDefinition("/minersbp clear", "Clear selection/preview.")
+        }, out var setCommandsError);
+
+        if (!string.IsNullOrWhiteSpace(setCommandsError))
+        {
+            Logger.LogWarning($"Failed to set /minersbp commands: {setCommandsError}");
         }
     }
 
     private void OnDestroy()
     {
-        ChatCommandsApi.UnregisterPrefix("mymod");
+        ChatCommandsApi.UnregisterPrefix("minersbp");
     }
 
-    private void HandleMyModCommand(string args)
+    private void ChatCommandHandler(string args)
     {
         var normalized = (args ?? string.Empty).Trim();
 
-        if (string.Equals(normalized, "print success", StringComparison.OrdinalIgnoreCase))
+        if (_commands.TryGetValue(normalized, out var handler))
         {
-            Logger.LogInfo("Command execution successful.");
-            ChatCommandsApi.PublishInfo("Command execution successful.");
+            handler();
             return;
         }
 
-        ChatCommandsApi.PublishError("Unknown mymod command. Try: /mymod print success");
+        ChatCommandsApi.PublishError("Unknown minersbp command. Type /help minersbp");
     }
+
+    private void HandleSetPos1()
+    {
+        Logger.LogInfo("set pos 1 command received");
+        ChatCommandsApi.PublishInfo("set pos 1 command received");
+    }
+
+    private void HandleSetPos2() { /* ... */ }
+    private void HandleCopy() { /* ... */ }
+    private void HandlePaste() { /* ... */ }
 }
 ```
