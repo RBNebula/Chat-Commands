@@ -247,6 +247,6 @@ public sealed partial class ChatCommands
         }
 
         _inputSuppressionWarningLogged = true;
-        _log?.LogWarning(message);
+        _log?.LogWarning($"{ModInfo.LOG_PREFIX} {message}");
     }
 }

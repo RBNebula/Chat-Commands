@@ -6,6 +6,114 @@ namespace ChatCommands;
 
 public sealed partial class ChatCommands
 {
+    private void OnGUI()
+    {
+        EnsureStyles();
+
+        const float sidePadding = 20f;
+        var boxWidth = Mathf.Min(720f, Screen.width - sidePadding * 2f);
+        var boxHeight = 44f;
+        const float bottomOffset = 160f;
+        var boxX = sidePadding;
+        var boxY = Screen.height - bottomOffset;
+        var boxRect = new Rect(boxX, boxY, boxWidth, boxHeight);
+        var textRect = new Rect(boxX + 12f, boxY + 9f, boxWidth - 24f, 26f);
+
+        DrawHistoryOverlay(boxX, boxY, boxWidth);
+
+        if (!_isOpen)
+        {
+            return;
+        }
+
+        TrySubmitFromGuiEvent();
+        if (!_isOpen)
+        {
+            return;
+        }
+
+        TryBrowseSubmittedInputFromGuiEvent();
+
+        var prev = GUI.color;
+        GUI.color = new Color(0f, 0f, 0f, 0.72f);
+        GUI.Box(boxRect, GUIContent.none, _chatBoxStyle);
+        GUI.color = prev;
+
+        GUI.SetNextControlName(InputControlName);
+        if (_focusInput || _moveCaretToEndFramesRemaining > 0)
+        {
+            FocusInputTextControl();
+        }
+
+        _line = GUI.TextField(textRect, _line ?? string.Empty, 512, _chatInputStyle);
+
+        if (_focusInput)
+        {
+            FocusInputTextControl();
+            _focusInput = false;
+        }
+
+        TryMoveCaretToEnd();
+        HandleInputEvents();
+        RefreshInlineSuggestion();
+        DrawInlineSuggestion(textRect);
+    }
+
+    private void TrySubmitFromGuiEvent()
+    {
+        var evt = Event.current;
+        if (evt.rawType != EventType.KeyDown && evt.type != EventType.KeyDown)
+        {
+            return;
+        }
+
+        if (evt.keyCode != KeyCode.Return && evt.keyCode != KeyCode.KeypadEnter)
+        {
+            return;
+        }
+
+        evt.Use();
+
+        if (_suppressSubmitThisFrame)
+        {
+            return;
+        }
+
+        SubmitCurrentLine();
+    }
+
+    private void TryBrowseSubmittedInputFromGuiEvent()
+    {
+        var evt = Event.current;
+        if (evt.rawType != EventType.KeyDown && evt.type != EventType.KeyDown)
+        {
+            return;
+        }
+
+        if (evt.keyCode == KeyCode.UpArrow)
+        {
+            if (TryBrowseSubmittedInput(older: true))
+            {
+                evt.Use();
+            }
+
+            return;
+        }
+
+        if (evt.keyCode == KeyCode.DownArrow)
+        {
+            if (TryBrowseSubmittedInput(older: false))
+            {
+                evt.Use();
+            }
+        }
+    }
+
+    private static void FocusInputTextControl()
+    {
+        GUI.FocusControl(InputControlName);
+    }
+
     private void HandleInputEvents()
     {
         if (!_lineChangedByCode && !string.Equals(_line, _lastObservedLine, StringComparison.Ordinal))

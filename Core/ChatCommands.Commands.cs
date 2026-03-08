@@ -22,18 +22,18 @@ public sealed partial class ChatCommands
     {
         if (!RegisterPrefix(
                 prefix: InternalPrefix,
-                owner: ModInfo.PluginGuid,
+                owner: ModInfo.PLUGIN_GUID,
                 handler: HandleInternalChatCommand,
                 description: InternalPrefixDescription,
                 error: out var registerError))
         {
-            _log?.LogWarning($"[ChatCommands] Failed to register /{InternalPrefix}: {registerError}");
+            _log?.LogWarning($"{ModInfo.LOG_PREFIX} Failed to register /{InternalPrefix}: {registerError}");
             return;
         }
 
         if (!SetCommands(InternalPrefix, InternalCommandDefinitions, out var setCommandsError))
         {
-            _log?.LogWarning($"[ChatCommands] Failed to set /{InternalPrefix} commands: {setCommandsError}");
+            _log?.LogWarning($"{ModInfo.LOG_PREFIX} Failed to set /{InternalPrefix} commands: {setCommandsError}");
         }
     }
 
@@ -144,7 +144,7 @@ public sealed partial class ChatCommands
         if (!TryParse(line, out var prefix, out var args))
         {
             const string msg = "Command format: /prefix args";
-            _log?.LogInfo($"[ChatCommands] {msg}");
+            _log?.LogInfo($"{ModInfo.LOG_PREFIX} {msg}");
             PushFeedbackLine(msg, isError: true);
             return;
         }
@@ -152,7 +152,7 @@ public sealed partial class ChatCommands
         if (!Registrations.TryGetValue(prefix, out var registration))
         {
             var msg = $"/{prefix} is not a recognized mod prefix. Please re-enter your command and try again.";
-            _log?.LogInfo($"[ChatCommands] {msg}");
+            _log?.LogInfo($"{ModInfo.LOG_PREFIX} {msg}");
             PushFeedbackLine(msg, isError: true);
             return;
         }
@@ -163,12 +163,12 @@ public sealed partial class ChatCommands
         }
         catch (Exception ex)
         {
-            _log?.LogError($"Handler for '/{registration.Prefix}' failed: {ex}");
+            _log?.LogError($"{ModInfo.LOG_PREFIX} Handler for '/{registration.Prefix}' failed: {ex}");
             PushFeedbackLine($"/{registration.Prefix} handler failed. Check BepInEx logs.", isError: true);
             return;
         }
 
-        _log?.LogInfo($"[ChatCommands] Dispatched '/{registration.Prefix}' to {registration.Owner}");
+        _log?.LogInfo($"{ModInfo.LOG_PREFIX} Dispatched '/{registration.Prefix}' to {registration.Owner}");
     }
 
     private static bool IsHelpCommand(string line)
@@ -189,7 +189,7 @@ public sealed partial class ChatCommands
             var helpLines = BuildHelpLines();
             for (var i = 0; i < helpLines.Count; i++)
             {
-                _log?.LogInfo($"[ChatCommands] {helpLines[i]}");
+                _log?.LogInfo($"{ModInfo.LOG_PREFIX} {helpLines[i]}");
                 PushFeedbackLine(helpLines[i], isError: false);
             }
 
@@ -202,7 +202,7 @@ public sealed partial class ChatCommands
         {
             var missing = normalizedPrefix.Length == 0 ? firstToken : normalizedPrefix;
             var msg = $"/help {missing}: prefix not found.";
-            _log?.LogInfo($"[ChatCommands] {msg}");
+            _log?.LogInfo($"{ModInfo.LOG_PREFIX} {msg}");
             PushFeedbackLine(msg, isError: true);
             return;
         }
@@ -210,7 +210,7 @@ public sealed partial class ChatCommands
         var lines = BuildPrefixHelpLines(registration);
         for (var i = 0; i < lines.Count; i++)
         {
-            _log?.LogInfo($"[ChatCommands] {lines[i]}");
+            _log?.LogInfo($"{ModInfo.LOG_PREFIX} {lines[i]}");
             PushFeedbackLine(lines[i], isError: false);
         }
     }
@@ -331,7 +331,7 @@ public sealed partial class ChatCommands
         ResetRegistrationCommandCatalog(registration, normalized);
         Registrations[normalized] = registration;
 
-        _log?.LogInfo($"Registered '/{normalized}' for {owner}.");
+        _log?.LogInfo($"{ModInfo.LOG_PREFIX} Registered '/{normalized}' for {owner}.");
         return true;
     }
 
@@ -372,7 +372,7 @@ public sealed partial class ChatCommands
             }
         }
 
-        _log?.LogInfo($"Updated command catalog for '/{normalized}' with {registration.Commands.Count} entries.");
+        _log?.LogInfo($"{ModInfo.LOG_PREFIX} Updated command catalog for '/{normalized}' with {registration.Commands.Count} entries.");
         return true;
     }
 
@@ -420,7 +420,7 @@ public sealed partial class ChatCommands
             }
         }
 
-        _log?.LogInfo($"Updated command catalog for '/{normalized}' with descriptions ({registration.Commands.Count} entries).");
+        _log?.LogInfo($"{ModInfo.LOG_PREFIX} Updated command catalog for '/{normalized}' with descriptions ({registration.Commands.Count} entries).");
         return true;
     }
 
@@ -447,7 +447,7 @@ public sealed partial class ChatCommands
         var removed = Registrations.Remove(normalized);
         if (removed)
         {
-            _log?.LogInfo($"Unregistered '/{normalized}'.");
+            _log?.LogInfo($"{ModInfo.LOG_PREFIX} Unregistered '/{normalized}'.");
         }
 
         return removed;
