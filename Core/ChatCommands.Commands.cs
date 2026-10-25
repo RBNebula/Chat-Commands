@@ -376,6 +376,33 @@ public sealed partial class ChatCommands
         return true;
     }
 
+    internal static bool SetAutocompleteCommands(string prefix, IEnumerable<string>? commands, out string error)
+    {
+        error = string.Empty;
+
+        var normalized = NormalizePrefix(prefix);
+        if (normalized.Length == 0)
+        {
+            error = "Prefix cannot be empty.";
+            return false;
+        }
+
+        if (!Registrations.TryGetValue(normalized, out var registration))
+        {
+            error = $"Prefix '/{normalized}' is not registered.";
+            return false;
+        }
+
+        if (!TrySetAutocompleteCatalog(registration, normalized, commands))
+        {
+            _log?.LogInfo($"{ModInfo.LOG_PREFIX} Cleared separate autocomplete catalog for '/{normalized}' and fell back to help commands.");
+            return true;
+        }
+
+        _log?.LogInfo($"{ModInfo.LOG_PREFIX} Updated autocomplete catalog for '/{normalized}' with {registration.AutocompleteCommands.Count} entries.");
+        return true;
+    }
+
     internal static bool SetCommands(string prefix, IEnumerable<ChatCommandsApi.CommandDefinition> commands, out string error)
     {
         error = string.Empty;
@@ -434,6 +461,41 @@ public sealed partial class ChatCommands
         {
             registration.CommandDescriptions[rootCommand] = registration.Description.Trim();
         }
+    }
+
+    private static bool TrySetAutocompleteCatalog(Registration registration, string normalizedPrefix, IEnumerable<string>? commands)
+    {
+        registration.AutocompleteCommands.Clear();
+        registration.HasSeparateAutocompleteCommands = false;
+
+        if (commands == null)
+        {
+            return false;
+        }
+
+        var rootCommand = "/" + normalizedPrefix;
+        var unique = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { rootCommand };
+        registration.AutocompleteCommands.Add(rootCommand);
+
+        foreach (var raw in commands)
+        {
+            var cmd = NormalizeCommand(raw, normalizedPrefix);
+            if (cmd.Length == 0 || !unique.Add(cmd))
+            {
+                continue;
+            }
+
+            registration.AutocompleteCommands.Add(cmd);
+        }
+
+        if (registration.AutocompleteCommands.Count <= 1)
+        {
+            registration.AutocompleteCommands.Clear();
+            return false;
+        }
+
+        registration.HasSeparateAutocompleteCommands = true;
+        return true;
     }
 
     internal static bool UnregisterPrefix(string prefix)

@@ -99,6 +99,27 @@ public static class ChatCommandsApi
         return ChatCommands.SetCommands(prefix, commands, out error);
     }
 
+    public static bool SetAutocompleteCommands(string prefix, IEnumerable<string>? commands)
+    {
+        if (!_hostReady)
+        {
+            return false;
+        }
+
+        return ChatCommands.SetAutocompleteCommands(prefix, commands, out _);
+    }
+
+    public static bool SetAutocompleteCommands(string prefix, IEnumerable<string>? commands, out string error)
+    {
+        if (!_hostReady)
+        {
+            error = "Chat Commands host is not ready.";
+            return false;
+        }
+
+        return ChatCommands.SetAutocompleteCommands(prefix, commands, out error);
+    }
+
     public static bool PublishInfo(string message)
     {
         if (!_hostReady)

@@ -314,9 +314,17 @@ public sealed partial class ChatCommands
         if (line.StartsWith("/", StringComparison.Ordinal))
         {
             Dispatch(line);
+            PushHistory(line);
+        }
+        else if (TryRelayPlainChatToMultiplayer(line, out var displayLine))
+        {
+            PushHistory(displayLine);
+        }
+        else
+        {
+            PushHistory(line);
         }
 
-        PushHistory(line);
         _line = string.Empty;
         _suppressOpenOnSubmitKeyUntilRelease = true;
         CloseInput();
@@ -638,9 +646,10 @@ public sealed partial class ChatCommands
 
         foreach (var reg in Registrations.Values)
         {
-            for (var i = 0; i < reg.Commands.Count; i++)
+            var source = reg.HasSeparateAutocompleteCommands ? reg.AutocompleteCommands : reg.Commands;
+            for (var i = 0; i < source.Count; i++)
             {
-                var cmd = reg.Commands[i];
+                var cmd = source[i];
                 if (unique.Add(cmd))
                 {
                     commands.Add(cmd);

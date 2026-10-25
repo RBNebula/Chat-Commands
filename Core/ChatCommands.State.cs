@@ -55,6 +55,8 @@ public sealed partial class ChatCommands
         public string Description { get; set; } = string.Empty;
         public Action<string> Handler { get; set; } = _ => { };
         public List<string> Commands { get; } = new();
+        public List<string> AutocompleteCommands { get; } = new();
+        public bool HasSeparateAutocompleteCommands { get; set; }
         public Dictionary<string, string> CommandDescriptions { get; } = new(StringComparer.OrdinalIgnoreCase);
     }
 

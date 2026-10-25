@@ -52,6 +52,9 @@ readonly struct CommandDefinition
 bool SetCommands(string prefix, IEnumerable<CommandDefinition> commands);
 bool SetCommands(string prefix, IEnumerable<CommandDefinition> commands, out string error);
 
+bool SetAutocompleteCommands(string prefix, IEnumerable<string>? commands);
+bool SetAutocompleteCommands(string prefix, IEnumerable<string>? commands, out string error);
+
 bool PublishInfo(string message);
 bool PublishInfo(string message, out string error);
 
@@ -64,22 +67,34 @@ Notes:
 - Example: `/mymod print success` -> handler args are `print success`.
 - All calls return `false` if the host is not ready.
 - `CommandDefinition.Description` is optional, and appears in `/help <prefix>` output when provided.
+- `SetCommands(...)` continues to drive both `/help <prefix>` and autocomplete by default.
+- `SetAutocompleteCommands(...)` lets a mod override autocomplete with a separate dynamic list.
+- Passing `null` or an empty list to `SetAutocompleteCommands(...)` clears the override and falls back to the help-command catalog again.
 
 ## Full Mod Example
 
-This plugin registers `/minersbp`, routes commands through a dictionary-based handler, and publishes command descriptions for `/help minersbp`.
+This plugin registers `/minersbp`, keeps a static documented command list for `/help minersbp`, and publishes a separate dynamic autocomplete catalog.
 
 ```csharp
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using BepInEx;
 using ChatCommands;
 
 [BepInPlugin("com.minersbp", "Miners Blueprint", "1.0.0")]
-[BepInDependency("com.chatcommands", BepInDependency.DependencyFlags.HardDependency)]
+[BepInDependency("com.ChatCommands", BepInDependency.DependencyFlags.HardDependency)]
 public sealed class MinersBlueprintPlugin : BaseUnityPlugin
 {
     private readonly Dictionary<string, Action> _commands = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ChatCommandsApi.CommandDefinition[] HelpCommands =
+    {
+        new("/minersbp set pos 1", "Set position 1."),
+        new("/minersbp set pos 2", "Set position 2."),
+        new("/minersbp copy", "Copy current selection."),
+        new("/minersbp paste", "Paste current clipboard."),
+        new("/minersbp clear", "Clear selection/preview.")
+    };
 
     // Handling the commands locally
     private void Awake()
@@ -109,20 +124,15 @@ public sealed class MinersBlueprintPlugin : BaseUnityPlugin
         }
 
         // Optional command metadata for autocomplete and /help output.
-        // Actual command behavior is implemented in ChatCommandHandler + _commands map.
-        ChatCommandsApi.SetCommands("minersbp", new[]
-        {
-            new ChatCommandsApi.CommandDefinition("/minersbp set pos 1", "Set position 1."),
-            new ChatCommandsApi.CommandDefinition("/minersbp set pos 2", "Set position 2."),
-            new ChatCommandsApi.CommandDefinition("/minersbp copy", "Copy current selection."),
-            new ChatCommandsApi.CommandDefinition("/minersbp paste", "Paste current clipboard."),
-            new ChatCommandsApi.CommandDefinition("/minersbp clear", "Clear selection/preview.")
-        }, out var setCommandsError);
+        // This curated list drives /help minersbp.
+        ChatCommandsApi.SetCommands("minersbp", HelpCommands, out var setCommandsError);
 
         if (!string.IsNullOrWhiteSpace(setCommandsError))
         {
             Logger.LogWarning($"Failed to set /minersbp commands: {setCommandsError}");
         }
+
+        RefreshAutocompleteCatalog();
     }
 
     private void OnDestroy()
@@ -143,6 +153,29 @@ public sealed class MinersBlueprintPlugin : BaseUnityPlugin
         ChatCommandsApi.PublishError("Unknown minersbp command. Type /help minersbp");
     }
 
+    private void RefreshAutocompleteCatalog()
+    {
+        var blueprintNames = GetBlueprintNames();
+        var directions = new[] { "north", "east", "south", "west" };
+
+        var autocompleteCommands = HelpCommands
+            .Select(def => def.Command)
+            .Concat(blueprintNames.Select(name => $"/minersbp load {name}"))
+            .Concat(directions.Select(direction => $"/minersbp paste {direction}"));
+
+        if (!ChatCommandsApi.SetAutocompleteCommands("minersbp", autocompleteCommands, out var autocompleteError) &&
+            !string.IsNullOrWhiteSpace(autocompleteError))
+        {
+            Logger.LogWarning($"Failed to set /minersbp autocomplete commands: {autocompleteError}");
+        }
+    }
+
+    private static IEnumerable<string> GetBlueprintNames()
+    {
+        yield return "starter-house";
+        yield return "smelter";
+    }
+
     private void HandleSetPos1()
     {
         Logger.LogInfo("set pos 1 command received");
@@ -154,3 +187,7 @@ public sealed class MinersBlueprintPlugin : BaseUnityPlugin
     private void HandlePaste() { /* ... */ }
 }
 ```
+
+Migration notes:
+- Existing mods can keep using `SetCommands(...)` only. Behavior is unchanged.
+- Mods that want curated help plus dynamic autocomplete should keep their documented commands in `SetCommands(...)`, then publish runtime suggestions through `SetAutocompleteCommands(...)`.
